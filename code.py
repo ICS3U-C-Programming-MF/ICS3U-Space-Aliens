@@ -6,6 +6,8 @@
 import ugame
 import stage
 
+import constants
+
 
 def game_scene():
     # This function is the main scene of the game
@@ -14,18 +16,17 @@ def game_scene():
     image_bank_background = stage.Bank.from_bmp16("space_aliens_background.bmp")
     image_bank_sprites = stage.Bank.from_bmp16("space_aliens.bmp")
 
-    # sets the background to the image 0 in the image bank
-    # and the size to 10x8 tiles of 16x16 pixels each
-    background = stage.Grid(image_bank_background, 10, 8)
+    # sets the background to the image 0 
+    background = stage.Grid(image_bank_background, constants.SCREEN_GRID_X, constants.SCREEN_GRID_Y)
 
-    # a sprite for that will be updated every frame
-    cowboy = stage.Sprite(image_bank_sprites, 5, 75, 66)
+    # a sprite thats updated every frame
+    ship = stage.Sprite(image_bank_sprites, 5, 75, constants.SCREEN_Y - (2 * constants.SPRITE_SIZE))
 
     # create a stage for the game background
-    game = stage.Stage(ugame.display, 60)
+    game = stage.Stage(ugame.display, constants.FPS)
 
     # set the background layer
-    game.layers = [cowboy] + [background]
+    game.layers = [ship] + [background]
 
     # render all sprites
     game.render_block()
@@ -36,26 +37,33 @@ def game_scene():
         keys = ugame.buttons.get_pressed()
 
         if keys & ugame.K_X:
-            print("A")
+            pass
         if keys & ugame.K_O:
-            print("B")
+            pass
         if keys & ugame.K_START:
-            print("START")
+            pass
         if keys & ugame.K_SELECT:
-            print("SELECT")
+            pass
         if keys & ugame.K_RIGHT:
-            cowboy.move(cowboy.x + 1, cowboy.y)
+            if ship.x <= constants.SCREEN_X - constants.SPRITE_SIZE:
+                ship.move(ship.x + 1, ship.y)
+            else:
+                ship.move(constants.SCREEN_X - constants.SPRITE_SIZE, ship.y)
         if keys & ugame.K_LEFT:
-            cowboy.move(cowboy.x - 1, cowboy.y)
+            if ship.x >= 0:
+                ship.move(ship.x - 1, ship.y)
+            else: 
+                ship.move(0, ship.y)
+
         if keys & ugame.K_UP:
-            cowboy.move(cowboy.x, cowboy.y - 1)
+            pass
         if keys & ugame.K_DOWN:
-            cowboy.move(cowboy.x, cowboy.y + 1)
+            pass
 
         # update game logic
 
         # redraw Sprites
-        game.render_sprites([cowboy])
+        game.render_sprites([ship])
         game.tick()
 
 
