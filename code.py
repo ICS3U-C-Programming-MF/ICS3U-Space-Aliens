@@ -10,7 +10,7 @@ import stage  # Handles sprites, backgrounds, and text
 import time  # handles events to make for pauses in the game
 import constants  # Stores screen size, FPS, palettes, etc.
 import random  # Used to generate random things (like alien positions)
-
+import supervisor  # Used to reload the game
 
 class SpaceAliens:
     def __init__(self):
@@ -34,8 +34,8 @@ class SpaceAliens:
                 self.scene = self.difficulty_selection()
             elif self.scene == "game":
                 self.scene = self.game_scene()
-            # elif self.scene == "over":
-            #    self.scene = self.game_over_scene()
+            elif self.scene == "over":
+                self.scene = self.game_over_scene()
 
     # --------------------------------------------------
     # BACK SPLASH SCENE
@@ -263,6 +263,12 @@ class SpaceAliens:
 
         # ------------ SCORE ---------------
         self.score = 0
+        score_text = stage.Text(
+            width=29, height=12)
+        score_text.clear()
+        score_text.cursor(0, 0)
+        score_text.move(1, 1)
+        score_text.text("Score: {0}".format(self.score)) 
         # ---------- IMAGE BANKS ----------
         image_bank_background = stage.Bank.from_bmp16("space_aliens_background.bmp")
         image_bank_sprites = stage.Bank.from_bmp16("space_aliens.bmp")
@@ -627,10 +633,68 @@ class SpaceAliens:
                         random.randint(0, constants.SCREEN_X - 16),
                         constants.OFF_TOP_SCREEN,
                     )
+            for alien_number in range(len(self.aliens)):
+                if self.aliens[alien_number].x > 0:
+                    if stage.collide(self.aliens[alien_number].x + 1, self.aliens[alien_number].y,   
+                                    self.aliens[alien_number].x + 15, self.aliens[alien_number].y + 15,
+                                    ship.x, ship.y,
+                                    ship.x + 15, ship.y + 15):
+                        # alien hit ship
+                        sound.stop()
+                        sound.play(explosion_sound)
+                        time.sleep(2.0)
+                        return "over"
             # ---------- RENDER ----------
             game.render_sprites(self.aliens + lasers + rockets + [ship])
             game.tick()
+    def game_over_scene(self):
+        """
+        Displays the game over screen.
+        """
+        sound = ugame.audio
+        sound.stop()
 
+        image_bank_2 = stage.Bank.from_bmp16("space_aliens_background.bmp")
+        
+        background = stage.Grid(
+            image_bank_2,
+            constants.SCREEN_GRID_X,
+            constants.SCREEN_GRID_Y,
+        )
+
+        text = []
+        text1 = stage.Text(
+            width=29, height=12, font=None, palette=constants.RED_PALETTE, buffer=None
+        )
+        text1.move(22, 20)
+        text1.text("GAME OVER")
+        text.append(text1)
+
+        text2 = stage.Text(
+            width=29, height=12, font=None, palette=constants.RED_PALETTE, buffer=None
+        )
+        text2.move(20, 50)
+        text2.text("Final Score: {}".format(self.score))
+        text.append(text2)
+
+        text3 = stage.Text(
+            width=29, height=12, font=None, palette=constants.RED_PALETTE, buffer=None
+        )
+        text3.move(10, 80)
+        text3.text("Press SELECT to return to menu")
+        text.append(text3)
+
+        game = stage.Stage(ugame.display, constants.FPS)
+        game.layers = text + [background]
+        game.render_block()
+
+        while True:
+            keys = ugame.buttons.get_pressed()
+            if keys & ugame.K_SELECT != 0:
+                return "menu"
+
+
+            game.tick()
 
 if __name__ == "__main__":
     game = SpaceAliens()
