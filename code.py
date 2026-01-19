@@ -15,6 +15,14 @@ import random  # Used to generate random things (like alien positions)
 class SpaceAliens:
     def __init__(self):
         self.scene = "splash"
+        self.difficulty = "easy"
+
+        # These MUST be lists — never numbers
+        self.aliens = []
+        self.aliens_alive = []
+        self.aliens_health = []
+        self.aliens_respawn_time = []
+        self.aliens_directions = []
 
     def run(self):
         while True:
@@ -26,6 +34,8 @@ class SpaceAliens:
                 self.scene = self.difficulty_selection()
             elif self.scene == "game":
                 self.scene = self.game_scene()
+            # elif self.scene == "over":
+            #    self.scene = self.game_over_scene()
 
     # --------------------------------------------------
     # BACK SPLASH SCENE
@@ -50,6 +60,8 @@ class SpaceAliens:
             constants.SCREEN_X,  # Grid width
             constants.SCREEN_Y,  # Grid height
         )
+
+        # ---------- RANDOMIZE BACKGROUND ----------
         for _ in range(3):
             for x_location in range(constants.SCREEN_GRID_X):
                 for y_location in range(constants.SCREEN_GRID_Y):
@@ -107,7 +119,7 @@ class SpaceAliens:
             constants.SCREEN_GRID_X,  # Grid width
             constants.SCREEN_GRID_Y,  # Grid height
         )
-
+        # ---------- RANDOMIZE BACKGROUND ----------
         for _ in range(3):
             for x_location in range(constants.SCREEN_GRID_X):
                 for y_location in range(constants.SCREEN_GRID_Y):
@@ -171,7 +183,7 @@ class SpaceAliens:
         background = stage.Grid(
             image_bank_background, constants.SCREEN_GRID_X, constants.SCREEN_GRID_Y
         )
-
+        # ---------- RANDOMIZE BACKGROUND ----------
         for _ in range(3):
             for x_location in range(constants.SCREEN_GRID_X):
                 for y_location in range(constants.SCREEN_GRID_Y):
@@ -215,18 +227,20 @@ class SpaceAliens:
             # ---------- CHECK SELECTION ----------
             if a_button == constants.button_state["button_just_pressed"]:
                 # HARD MODE VARIABLES WOULD GO HERE
-                aliens = constants.TOTAL_NUMBER_OF_ALIENS + 3  # Example variable change
+                self.alien_count = constants.TOTAL_NUMBER_OF_ALIENS + 3  # HARD
                 # PROCEED TO GAME
                 sound.play(coin_sound)
                 time.sleep(0.8)
+                self.difficulty = "hard"
                 return "game"
 
             if b_button == constants.button_state["button_just_pressed"]:
                 # EASY MODE VARIABLES WOULD GO HERE
-                aliens = constants.TOTAL_NUMBER_OF_ALIENS - 3  # Example variable change
+                self.alien_count = constants.TOTAL_NUMBER_OF_ALIENS + 3  # HARD
                 # PROCEED TO GAME
                 sound.play(coin_sound)
                 time.sleep(0.8)
+                self.difficulty = "easy"
                 return "game"
 
             game.render_block()
@@ -241,6 +255,14 @@ class SpaceAliens:
         Handles movement, sound, and sprite updates.
         """
 
+        self.aliens.clear()
+        self.aliens_alive.clear()
+        self.aliens_health.clear()
+        self.aliens_respawn_time.clear()
+        self.aliens_directions.clear()
+
+        # ------------ SCORE ---------------
+        self.score = 0
         # ---------- IMAGE BANKS ----------
         image_bank_background = stage.Bank.from_bmp16("space_aliens_background.bmp")
         image_bank_sprites = stage.Bank.from_bmp16("space_aliens.bmp")
@@ -255,6 +277,8 @@ class SpaceAliens:
         pew_sound = open("pew.wav", "rb")  # Laser sound
         boom_sound = open("boom.wav", "rb")  # Explosion sound
         pew2_sound = open("pew2.wav", "rb")  # Alternate laser sound
+        reload_sound = open("reload.wav", "rb")  # Reload sound
+        explosion_sound = open("explosion.wav", "rb")  # Explosion sound
         sound = ugame.audio
         sound.stop()
         sound.mute(False)
@@ -276,6 +300,7 @@ class SpaceAliens:
         ammo_text.move(20, 5)
         ammo_text.text("Rocket Ammo: 3")
 
+        # ---------- RANDOMIZE BACKGROUND ----------
         for _ in range(3):
             for x_location in range(constants.SCREEN_GRID_X):
                 for y_location in range(constants.SCREEN_GRID_Y):
@@ -290,18 +315,38 @@ class SpaceAliens:
             constants.SCREEN_Y - (2 * constants.SPRITE_SIZE),
         )
 
+        # ---------- ALIENS ----------
         self.aliens = []
         self.aliens_directions = []
+        self.aliens_alive = []
+        self.aliens_respawn_time = []
+        self.aliens_health = []
+
         for alien_number in range(constants.TOTAL_NUMBER_OF_ALIENS):
+            # pick a random sprite index for the alien, skipping 4
+            sprite_index = random.choice(
+                [6, 7, 9]
+            )  # skip other sprits to not cause confusion
+
             a_single_alien = stage.Sprite(
                 image_bank_sprites,
-                9,
-                random.randint(0, constants.SCREEN_X - constants.SPRITE_SIZE),
-                random.randint(0, 40),
+                sprite_index,  # use the randomized sprite
+                constants.OFF_SCREEN_X,
+                alien_number * constants.SPRITE_SIZE,
             )
+
+            # Append to all lists
             self.aliens.append(a_single_alien)
+            self.aliens_alive.append(True)
+            self.aliens_respawn_time.append(0)
             self.aliens_directions.append(random.choice([-1, 1]))
 
+            if self.difficulty == "hard":
+                self.aliens_health.append(4)
+            else:
+                self.aliens_health.append(2)
+
+        # ---------- LASERS ----------
         lasers = []
         for laser_number in range(constants.TOTAL_NUMBER_OF_LASERS):
             a_single_laser = stage.Sprite(
@@ -309,12 +354,17 @@ class SpaceAliens:
             )
             lasers.append(a_single_laser)
 
+        # ---------- ROCKETS ----------
         rockets = []
         for rocket_number in range(constants.TOTAL_NUMBER_OF_ROCKETS):
             a_single_rocket = stage.Sprite(
-                image_bank_sprites, 10, constants.OFF_SCREEN_X, constants.OFF_SCREEN_Y
+                image_bank_sprites,
+                12,  # rocket_fire.bmp sprite index
+                constants.OFF_SCREEN_X,
+                constants.OFF_SCREEN_Y,
             )
             rockets.append(a_single_rocket)
+
         # ---------- STAGE ----------
         game = stage.Stage(ugame.display, constants.FPS)
         game.layers = self.aliens + lasers + rockets + [ship] + [background]
@@ -352,7 +402,6 @@ class SpaceAliens:
                 ship.move(
                     min(ship.x + 1, constants.SCREEN_X - constants.SPRITE_SIZE), ship.y
                 )
-
             if keys & ugame.K_LEFT:
                 ship.move(max(ship.x - 1, 0), ship.y)
 
@@ -368,7 +417,7 @@ class SpaceAliens:
             if a_button == constants.button_state["button_just_pressed"]:
                 # Fire laser from ship
                 for laser_numbers in range(len(lasers)):
-                    if lasers[laser_numbers].x < 0:  # If laser is off screen
+                    if lasers[laser_numbers].x == constants.OFF_SCREEN_X:
                         lasers[laser_numbers].move(ship.x, ship.y)
                         sound.play(pew_sound)
                         break
@@ -393,13 +442,16 @@ class SpaceAliens:
                 # ---------- RELOADING MECHANISM ----------
                 if reloading:
                     if time.monotonic() - reload_start_time >= constants.RELOAD_TIME:
+                        sound.play(reload_sound)
                         rocket_ammo = constants.TOTAL_NUMBER_OF_ROCKETS
                         reloading = False
                         ammo_text.text("Rocket Ammo: {}".format(rocket_ammo))
+
             # ---------- ALIEN BOSS AND DIFFRENT TYPES ----------
+
             # ---------- LASER MOVEMENT ----------
             for laser_number in range(len(lasers)):
-                if lasers[laser_number].x > 0:  # If laser is on screen
+                if lasers[laser_number].x >= 0:  # If laser is on screen
                     lasers[laser_number].move(
                         lasers[laser_number].x,
                         lasers[laser_number].y - constants.LASER_SPEED,
@@ -412,7 +464,7 @@ class SpaceAliens:
 
             # ---------- ROCKET MOVEMENT ----------
             for rocket_number in range(len(rockets)):
-                if rockets[rocket_number].x > 0:  # If rocket is on screen
+                if rockets[rocket_number].x >= 0:  # If rocket is on screen
                     rockets[rocket_number].move(
                         rockets[rocket_number].x,
                         rockets[rocket_number].y - constants.ROCKET_SPEED,
@@ -422,25 +474,144 @@ class SpaceAliens:
                         rockets[rocket_number].move(
                             constants.OFF_SCREEN_X, constants.OFF_SCREEN_Y
                         )
+            # ---------- COLLISION DETECTION ----------
+
+            hit_effects = []
+
+            # ---------- LASER COLLISIONS ----------
+            for laser_number in range(len(lasers)):
+                laser = lasers[laser_number]
+                if laser.x > 0:  # if on screen
+                    for i in range(len(self.aliens)):
+                        alien = self.aliens[i]
+                        if alien.x > 0:
+                            if stage.collide(
+                                laser.x + 6,
+                                laser.y + 2,
+                                laser.x + 11,
+                                laser.y + 12,
+                                alien.x + 1,
+                                alien.y,
+                                alien.x + 15,
+                                alien.y + 15,
+                            ):
+                                # Record hit effect
+                                hit_effects.append(
+                                    [alien.x, alien.y, time.monotonic(), "laser"]
+                                )
+                                self.aliens_health[i] -= 1
+                                laser.move(
+                                    constants.OFF_SCREEN_X, constants.OFF_SCREEN_Y
+                                )
+                                sound.play(explosion_sound)
+                                if self.aliens_health[i] <= 0:
+                                    self.aliens_alive[i] = False
+                                    self.aliens_respawn_time[i] = time.monotonic()
+                                    alien.move(
+                                        constants.OFF_SCREEN_X, constants.OFF_SCREEN_Y
+                                    )
+                                    self.score += 1
+
+            # ---------- ROCKET COLLISIONS ----------
+            for rocket_number in range(len(rockets)):
+                rocket = rockets[rocket_number]
+                if rocket.x > 0:
+                    for i in range(len(self.aliens)):
+                        alien = self.aliens[i]
+                        if alien.x > 0:
+                            if stage.collide(
+                                rocket.x + 6,
+                                rocket.y + 2,
+                                rocket.x + 11,
+                                rocket.y + 12,
+                                alien.x + 1,
+                                alien.y,
+                                alien.x + 15,
+                                alien.y + 15,
+                            ):
+                                # Rocket damage
+                                if self.difficulty == "hard":
+                                    self.aliens_health[i] -= 2
+                                else:
+                                    self.aliens_health[i] -= 2
+
+                                rocket.move(
+                                    constants.OFF_SCREEN_X, constants.OFF_SCREEN_Y
+                                )
+                                sound.play(explosion_sound)
+
+                                if self.aliens_health[i] <= 0:
+                                    self.aliens_alive[i] = False
+                                    self.aliens_respawn_time[i] = time.monotonic()
+                                    alien.move(
+                                        constants.OFF_SCREEN_X, constants.OFF_SCREEN_Y
+                                    )
+                                    self.score += 1
+
+            # ---------- DISPLAY HIT EFFECTS ----------
+            # Remove hit effects after 0.2 seconds
+            for effect in hit_effects[:]:
+                x, y, start_time, effect_type = effect
+                # Show the effect (can use same sprite as laser/rocket)
+                if effect_type == "laser":
+                    temp_sprite = stage.Sprite(image_bank_sprites, 10, x, y)
+                else:
+                    temp_sprite = stage.Sprite(image_bank_sprites, 12, x, y)
+                game.render_sprites([temp_sprite])
+                if time.monotonic() - start_time > 0.2:
+                    hit_effects.remove(effect)
+            # ---------- RESPAWN ALIENS ----------
+            for i in range(len(self.aliens)):
+
+                if not self.aliens_alive[i]:
+                    if time.monotonic() - self.aliens_respawn_time[i] >= 4:
+                        self.aliens[i].move(
+                            random.randint(
+                                0, constants.SCREEN_X - constants.SPRITE_SIZE
+                            ),
+                            constants.OFF_TOP_SCREEN,
+                        )
+                        self.aliens_alive[i] = True
+
             # -----------GAME RESTART / DEBUG HACKS----------
 
             # If START is pressed, move to menu screen
             if keys & ugame.K_START:
-                return "menu"
+                return "difficulty"
+
+            # if SELECT is pressed, open a password menu (debug hack)
+            if keys & ugame.K_SELECT:
+                pass  # Placeholder for password menu functionality
+                # Up, Down, Down, Left, Right = infinite score
+                # down down left right a a = no laser or rocket cooldown
+                # left left left left left right = all aliens are stuck going left
+                # a, a, a, a, a, = mega boss fight
+                # right right right right right left = all aliens are stuck going right
+                # Up, down, left, right, a, b, = slow motion mode
 
             # ----------- ALIEN MOVEMENT ----------
             for i in range(len(self.aliens)):
-                alien = self.aliens[i]
+                if not self.aliens_alive[i]:
+                    continue  # skip dead aliens
 
+                alien = self.aliens[i]
                 random_move = random.randint(1, 4)
-                if random_move == 1 or random_move == 2:
-                    # Move alien down
+
+                if random_move <= 2:
+                    # Move down
                     alien.move(alien.x, alien.y + constants.NORMAL_ALIEN_SPEED)
-                elif random_move == 3 or random_move == 4:
-                    # Horizontal movement
+                else:
+                    # Move sideways + down
                     alien.move(
                         alien.x + self.aliens_directions[i],
                         alien.y + constants.NORMAL_ALIEN_SPEED,
+                    )
+
+                # Respawn ONLY if alive
+                if alien.y > constants.SCREEN_Y:
+                    alien.move(
+                        random.randint(0, constants.SCREEN_X - 16),
+                        constants.OFF_TOP_SCREEN,
                     )
 
                 # Bounce off walls
@@ -451,12 +622,11 @@ class SpaceAliens:
                     self.aliens_directions[i] *= -1
 
                 # Respawn if off screen
-                if alien.y > constants.SCREEN_Y:
+                if self.aliens_alive[i] and alien.y > constants.SCREEN_Y:
                     alien.move(
-                        random.randint(0, constants.SCREEN_X - constants.SPRITE_SIZE),
+                        random.randint(0, constants.SCREEN_X - 16),
                         constants.OFF_TOP_SCREEN,
                     )
-
             # ---------- RENDER ----------
             game.render_sprites(self.aliens + lasers + rockets + [ship])
             game.tick()
